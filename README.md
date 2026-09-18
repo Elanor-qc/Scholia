@@ -1,8 +1,8 @@
-# margin
+# Scholia
 
 把一篇论文读透，产出一份**可编辑的单文件 HTML 精读笔记**：正文中段嵌一张横向方法管线图，点图上任意节点跳到对应详解章节，每个章节下面留一块空白给你写心得。
 
-> 页边那道空白是留给你的。正文由 AI 预填，心得永远留空给你写。
+> Scholia（σχόλια），古典文献页边的批注。正文由 AI 预填，页边那道空白永远留给你写。
 
 `examples/3dgs-example-note.html` 是一份完整产出（读的是 3D Gaussian Splatting 原论文），下载下来直接用浏览器打开就能看效果，不用先装任何东西。
 
@@ -27,7 +27,7 @@
 作为 WorkBuddy skill 使用，把整个目录放到 skill 目录下：
 
 ```bash
-cp -r margin ~/.workbuddy/skills/margin
+cp -r scholia ~/.workbuddy/skills/scholia
 ```
 
 之后直接对 agent 说「读下这篇论文」并给出本地 PDF 路径或 arXiv 链接即可触发，不用点名。

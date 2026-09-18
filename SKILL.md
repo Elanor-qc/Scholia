@@ -1,12 +1,12 @@
 ---
-name: margin
+name: scholia
 description: 把一篇论文（本地 PDF 或 arXiv 链接）读透，产出一份可编辑的单文件 HTML 精读笔记——正文中段嵌一张横向方法管线图，点击图上节点跳到对应详解章节。当用户说「读论文」「精读这篇」「这篇论文帮我整理一下」「读下这个 arXiv」「论文笔记」「paper note」时使用。
 agent_created: true
 ---
 
-# margin · 论文精读 → 可编辑 HTML 笔记
+# scholia · 论文精读 → 可编辑 HTML 笔记
 
-> 页边那道空白是留给你的：正文由 AI 预填，心得永远留空给你写。
+> scholia，古典文献页边的批注。正文由 AI 预填，页边那道空白永远留给你写。
 
 ## 产出目标
 
@@ -104,7 +104,7 @@ curl -sL "https://arxiv.org/pdf/<ID>.pdf" -o "<工作目录>/paper.pdf"
 
 ```bash
 "C:/Users/elanorgao/.workbuddy/binaries/python/versions/3.13.12/python.exe" \
-  "C:/Users/elanorgao/.workbuddy/skills/margin/scripts/build_note.py" \
+  "C:/Users/elanorgao/.workbuddy/skills/scholia/scripts/build_note.py" \
   --content "<工作目录>/content.json" \
   --out "<工作目录>/<论文简称>-精读笔记.html"
 ```
@@ -117,7 +117,7 @@ curl -sL "https://arxiv.org/pdf/<ID>.pdf" -o "<工作目录>/paper.pdf"
 
 ```bash
 "C:/Users/elanorgao/.workbuddy/binaries/python/versions/3.13.12/python.exe" \
-  "C:/Users/elanorgao/.workbuddy/skills/margin/scripts/smoke_test.py" \
+  "C:/Users/elanorgao/.workbuddy/skills/scholia/scripts/smoke_test.py" \
   "<刚生成的 html>"
 ```
 
