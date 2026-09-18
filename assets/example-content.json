@@ -1,0 +1,116 @@
+{
+  "meta": {
+    "title": "3D Gaussian Splatting for Real-Time Radiance Field Rendering",
+    "title_zh": "用于实时辐射场渲染的三维高斯泼溅",
+    "authors": "Bernhard Kerbl, Georgios Kopanas, Thomas Leimkühler, George Drettakis",
+    "affiliation": "INRIA Sophia Antipolis / Université Côte d'Azur, MPI Informatik",
+    "venue": "SIGGRAPH 2023 (ACM TOG 42(4))",
+    "arxiv": "2308.04079",
+    "url": "https://arxiv.org/abs/2308.04079",
+    "code": "https://github.com/graphdeco-inria/gaussian-splatting",
+    "date": "2026-09-18",
+    "tags": ["3DGS", "辐射场", "实时渲染", "显式表示", "novel view synthesis"],
+    "depth": "精读"
+  },
+  "diagram": {
+    "title": "方法管线",
+    "after": "problem",
+    "nodes": [
+      {"id": "sfm", "label": "SfM 点云", "sub": "COLMAP 输出", "kind": "io", "col": 0, "row": 0},
+      {"id": "init", "label": "高斯初始化", "sub": "位置/尺度/旋转", "kind": "proc", "col": 1, "row": 0},
+      {"id": "gauss", "label": "各向异性高斯", "sub": "Σ = R S Sᵀ Rᵀ", "kind": "latent", "col": 2, "row": 0},
+      {"id": "raster", "label": "Tile 光栅化", "sub": "16×16 tile", "kind": "proc", "col": 3, "row": 0},
+      {"id": "image", "label": "渲染图像", "sub": "α-blending", "kind": "io", "col": 4, "row": 0},
+      {"id": "density", "label": "密度控制", "sub": "分裂/克隆/删除", "kind": "aux", "col": 2, "row": 1},
+      {"id": "loss", "label": "重建损失", "sub": "L1 + D-SSIM", "kind": "loss", "col": 4, "row": 1}
+    ],
+    "edges": [
+      {"from": "sfm", "to": "init", "label": "种子点"},
+      {"from": "init", "to": "gauss", "label": "初始化"},
+      {"from": "gauss", "to": "raster", "label": "投影"},
+      {"from": "raster", "to": "image", "label": "累积"},
+      {"from": "gauss", "to": "density", "label": "位置梯度"},
+      {"from": "density", "to": "gauss", "label": "回写"},
+      {"from": "image", "to": "loss", "label": "监督"}
+    ]
+  },
+  "modules": [
+    {
+      "id": "sfm",
+      "title": "输入：SfM 点云",
+      "html": "<p>不做从零优化，直接用 <strong>COLMAP 稀疏点云</strong>做种子。这一步很朴素但很关键——给了优化一个几何上靠谱的起点，避开了随机初始化容易踩的局部极小。</p><p>代价也很明确：<em>位姿不准或 SfM 失败，后面全崩</em>，这里没有自校正机制。</p>"
+    },
+    {
+      "id": "init",
+      "title": "初始化：从点云到高斯",
+      "html": "<p>每个点变成一个三维高斯，拿到四组参数：中心 <code>μ</code>、协方差 <code>Σ</code>、不透明度 <code>α</code>、球谐系数 <code>SH</code>。</p><p>协方差不直接优化矩阵元素，而是拆成缩放矩阵和旋转矩阵的乘积 <code>Σ = R S Sᵀ Rᵀ</code>，优化 scale 向量和四元数——这样能保证半正定性，不会出现「协方差矩阵跑歪了」的情况。</p>"
+    },
+    {
+      "id": "gauss",
+      "title": "表示：各向异性高斯",
+      "html": "<p><strong>各向异性是这篇的命门。</strong>高斯可以压成薄片去贴墙面、拉成细条去贴边缘，比各向同性的球省掉大量冗余——消融里去掉各向异性，质量掉得很明显，说明它不只是省参数。</p><p>方向相关的颜色用<strong>球谐函数</strong>表达，阶数越高越能表达镜面/视角相关外观，日常场景三阶够用。</p><p>场景规模：<em>百万级高斯</em>，这也是显存和存储压力的来源。</p>"
+    },
+    {
+      "id": "raster",
+      "title": "渲染：可微 tile 光栅化",
+      "html": "<ul><li>把屏幕切成 <strong>16×16 的 tile</strong>，按 tile 做视锥剔除，每个高斯只进它可能覆盖的 tile。</li><li>不做全局排序，只做 <strong>tile 内的粗粒度深度排序</strong>，配合按 tile 并行的 GPU 光栅化。</li><li>前向按 α-blending 累积颜色，反向沿同样的 tile 结构逐高斯回传梯度。</li></ul><p>本质就是一坨可微的画点操作：<strong>没有 CNN，没有体积采样</strong>。这也是它能跑到 1080p 实时的原因。</p><p>工程上这里是最大的坑——依赖自定义 CUDA 算子，CUDA/驱动版本敏感。</p>"
+    },
+    {
+      "id": "image",
+      "title": "输出：可微渲染结果",
+      "html": "<p>整条链从头到尾可微，所以渲染结果能直接和真值比损失、回传梯度。这是显式表示相对 mesh/点云老方法的核心优势：<strong>不需要任何后处理网络来补洞</strong>。</p>"
+    },
+    {
+      "id": "density",
+      "title": "自适应密度控制",
+      "html": "<p>训练过程中动态调整高斯的数量和分布：</p><ul><li><strong>分裂</strong>：位置梯度大的<em>大</em>高斯拆成两个小的，补细节。</li><li><strong>克隆</strong>：位置梯度大的<em>小</em>高斯复制一份，沿梯度方向推开。</li><li><strong>删除</strong>：不透明度掉到阈值以下的直接丢。</li><li><strong>不透明度重置</strong>：每隔若干次迭代把 α 压到接近 0，逼「没用的」高斯现形后被淘汰，防止密集区域堆积。</li></ul><p>消融里去掉这一整套，几何细节和覆盖率都会出问题（空洞 + 过度平滑）。</p>"
+    },
+    {
+      "id": "loss",
+      "title": "训练目标",
+      "html": "<p>渲染图和真值之间用 <code>L1</code> 加 <code>D-SSIM</code> 的组合损失，配合上面密度控制里的几个手工阈值一起优化。</p><p><em>论文没说清的地方</em>：密度控制的几个阈值怎么选、跨场景要不要重调——实践里这部分基本靠经验。</p>"
+    }
+  ],
+  "blocks": [
+    {
+      "id": "tldr",
+      "title": "一句话结论",
+      "html": "<p>把场景显式地表示成几百万个带各向异性协方差的三维高斯，再用可微的 tile-based 光栅化直接画出来——质量追平当时最好的 NeRF 系方法，渲染做到 1080p 实时，训练从「天」压到「小时」量级。</p><p>核心取舍是：<strong>放弃隐式网络空空间跳过的那套优雅，换显式表示的暴力可控</strong>。优化一个点云，而不是训练一个网络。</p>"
+    },
+    {
+      "id": "problem",
+      "title": "要解决什么问题",
+      "html": "<p>2023 年前后辐射场的两条主流路线各有硬伤：</p><ul><li><strong>隐式 NeRF 系</strong>：质量好，但每帧要沿射线采样几百个点过 MLP，渲染慢到没法实时，训练要几十小时。加速方案（InstantNGP 等）靠哈希网格跳过空空间，代价是结构复杂、仍依赖体积积分。</li><li><strong>点云 / mesh 系</strong>：渲染快，但离散采样导致噪声和空洞，靠 CNN 修复后处理，质量上限受限，还容易在多视图间闪烁。</li></ul><p>作者要的是：<strong>既要 NeRF 级质量，又要点云级速度</strong>，并且训练不能慢。</p>"
+    },
+    {
+      "id": "experiments",
+      "title": "实验与结果",
+      "html": "<p>数据集：Mip-NeRF360、Tanks&amp;Temples、Deep Blending。对比 Mip-NeRF360、InstantNGP、Plenoxels。</p><p>结论层面（<em>具体数值以论文 Table 1–3 为准，我这份笔记只记趋势</em>）：</p><ul><li><strong>质量</strong>：与 Mip-NeRF360 基本持平，部分场景略优；室外/无边界场景略弱于最好的隐式方法。</li><li><strong>速度</strong>：渲染 1080p 实时，比隐式方法快一到两个数量级——最大的卖点。</li><li><strong>训练</strong>：单卡上从几十小时压到数十分钟到一小时量级，和 InstantNGP 同档。</li></ul><p>实用副产品：<strong>训练中间态可直接看</strong>，几秒后就能看到模糊场景逐渐变清晰，debug 体验远好于 NeRF。</p>"
+    },
+    {
+      "id": "ablation",
+      "title": "消融告诉我们的事",
+      "html": "<ul><li><strong>去掉各向异性</strong>：质量明显掉，「能压扁」这件事贡献很大。</li><li><strong>去掉自适应密度控制</strong>：空洞 + 过度平滑。</li><li><strong>初始化换成随机点</strong>：收敛变慢且更容易卡住，SfM 先验确实有用。</li><li><strong>SH 阶数</strong>：高阶对镜面/视角相关外观有帮助，日常场景三阶够用。</li></ul><p>一句话：<strong>增益是「表示 + 密度控制」联合贡献的，单拆一项都不成立</strong>。</p>"
+    },
+    {
+      "id": "contribution",
+      "title": "创新点",
+      "html": "<ol><li>用<strong>各向异性三维高斯</strong>作为辐射场的显式表示，兼顾连续可微与显式可控。</li><li>一套<strong>可微 tile-based 光栅化器</strong>，把渲染和梯度回传统一进同一个 GPU 友好的结构。</li><li><strong>自适应密度控制</strong>，让优化过程自己决定在哪儿加细节、哪儿砍掉。</li></ol><p>创新不在数学上多深，而在<strong>把三件已有的东西拼对了，并且工程上做透了</strong>——这也是它能迅速成为事实标准的原因。</p>"
+    },
+    {
+      "id": "limits",
+      "title": "局限与疑点",
+      "html": "<ul><li><strong>显存与存储</strong>：百万级高斯，单场景几百 MB，大模型/多场景不友好。</li><li><strong>依赖 SfM 位姿</strong>：COLMAP 挂了或者位姿不准，结果直接崩。</li><li><strong>无纹理 / 弱观测区域</strong>：容易长出絮状物和浮空高斯，靠不透明度重置缓解但不根治。</li><li><strong>视图不一致伪影</strong>：换视角可能 popping、闪烁，本质是过拟合到训练视角。</li><li><strong>非朗伯表面</strong>：镜面、透明、强反射场景 SH 表达力不够，后续工作（3DGS-MCMC、Spec-GS）在补这块。</li><li><strong>论文没说清的</strong>：密度控制阈值的选择依据、跨场景迁移是否要重调。</li></ul>"
+    },
+    {
+      "id": "reproduce",
+      "title": "可复刻性",
+      "html": "<p><span class=\"flag ok\">代码开源</span>官方实现 <code>graphdeco-inria/gaussian-splatting</code>，社区生态极大。</p><ul><li><strong>数据</strong>：公开数据集为主；自定义数据需要自己跑 COLMAP，这是主要工程成本。</li><li><strong>算力</strong>：单张 24GB 显存卡可跑通标准场景；显存不足时高斯数量被迫下调，质量随之下降。</li><li><strong>环境</strong>：依赖自定义 CUDA 算子（diff-gaussian-rasterization），版本敏感，装环境是常见坑点。</li><li><strong>时间</strong>：跑通官方 demo 约半小时；改内核要读光栅化源码，门槛陡增。</li></ul><p>要抄的模块排序（从易到难）：不透明度重置 → 密度控制策略 → SH 颜色 → 光栅化内核。</p>"
+    },
+    {
+      "id": "relevance",
+      "title": "与我研究的关联",
+      "html": "<p><strong>针对 3dgsVAE 的背景，这里是最值得警惕的一点：</strong>3DGS 的本质是一个<em>无序、可变长</em>的基元集合——这对 VAE 非常不友好。标准编码器要么需要固定长度输入，要么需要一个规整的网格/序列结构，而高斯点云两样都没有。</p><h4>可能的切入点</h4><ul><li><strong>结构化锚点</strong>：像 Scaffold-GS 那样把高斯挂在体素/anchor 网格上，让 latent 有空间对应关系，编码器就能用 3D 卷积。</li><li><strong>per-splat latent + 集合编码</strong>：把每个高斯的属性当 token，用 PointNet / Set Transformer 聚合，天然处理置换不变性。</li><li><strong>先压成规整再压 latent</strong>：3DGS → triplane / hash grid → VAE，绕开集合结构问题，代价是丢掉部分显式可解释性。</li></ul><h4>可能不相关</h4><p>这篇的渲染速度优势，在「做生成/压缩」的语境下并不直接迁移——我们在意的是 latent 空间的紧凑和解耦，不是能否 30fps 出图。别被实时性带偏。</p><h4>待你拍板</h4><p>上面三条切入点走哪条，取决于你更在意 latent 的可解释性还是压缩率。我没有替你选。</p>"
+    }
+  ]
+}
