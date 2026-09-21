@@ -3,6 +3,7 @@
 
 正文顺序：结论 → 问题 → 【横向方法管线图】→ 图上各模块详解 → 实验 → ……
 图上的节点可点击跳转到对应详解章节。
+各 module / block 可嵌入论文原图（base64 内联），放在文字详解上方。
 
 用法:
     python build_note.py --content content.json --out "论文精读笔记.html"
@@ -18,8 +19,10 @@ content.json 结构:
     ],
     "edges": [{"from":"init","to":"gauss","label":"初始化属性"}]
   },
-  "modules": [{"id":"gauss","title":"表示：各向异性高斯","html":"<p>...</p>","ph":"可选"}],
-  "blocks": [{"id":"problem","title":"要解决什么问题","html":"<p>...</p>"}]
+  "modules": [{"id":"gauss","title":"表示：各向异性高斯","html":"<p>...</p>",
+               "figure":{"src":"fig3.png","caption":"图注"},"ph":"可选"}],
+  "blocks": [{"id":"problem","title":"要解决什么问题","html":"<p>...</p>",
+              "figure":{"src":"fig1.png","caption":"..."}}]
 }
 
 横向布局约定：主干走 row 0，col 从左到右递增；辅助/损失模块下挂到 row 1。
@@ -27,6 +30,7 @@ kind 取值: io(输入/输出) proc(处理) latent(表示/latent) loss(损失/�
 """
 
 import argparse
+import base64
 import html
 import json
 import os
@@ -73,6 +77,48 @@ class BuildError(Exception):
 
 def esc(s):
     return html.escape(str(s), quote=False)
+
+
+# ---- figure embedding ----
+
+MIME_MAP = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".svg": "image/svg+xml",
+}
+
+
+def embed_figure(figure, content_dir):
+    """把 figure 字段转成 <figure><img><figcaption></figure> HTML。
+
+    figure 格式: {"src": "相对路径", "caption": "可选图注"}
+    图片读取后内联为 base64 data URI，保持单文件自包含。
+    """
+    src = figure.get("src", "")
+    if not src:
+        return ""
+    path = os.path.join(content_dir, src)
+    if not os.path.exists(path):
+        print("[build_note] 警告: 图片不存在，已跳过: %s" % path, file=sys.stderr)
+        return ""
+    ext = os.path.splitext(src)[1].lower()
+    mime = MIME_MAP.get(ext)
+    if not mime:
+        print("[build_note] 警告: 不支持的图片格式 %s，跳过: %s" % (ext, path), file=sys.stderr)
+        return ""
+    with open(path, "rb") as f:
+        data = base64.b64encode(f.read()).decode("ascii")
+    data_uri = "data:%s;base64,%s" % (mime, data)
+    caption = figure.get("caption", "")
+    fig = '<figure class="paper-fig"><img src="%s" alt="%s"' % (data_uri, esc(caption))
+    fig += ' loading="lazy"></img>'
+    if caption:
+        fig += '\n<figcaption>%s</figcaption>' % esc(caption)
+    fig += '</figure>'
+    return fig
 
 
 def load_asset(name):
@@ -251,15 +297,17 @@ def render_legend(d):
 
 # ---------------------------------------------------------------- cards
 
-def card(cid, title, body, ph, is_module):
+def card(cid, title, body, ph, is_module, figure_html=""):
     anchor = ("mod-" if is_module else "blk-") + cid
+    fig_block = ("\n  " + figure_html) if figure_html else ""
     return (
         '<section class="blk%s" id="%s">\n'
-        '  <h2>%s</h2>\n'
+        '  <h2>%s</h2>\n%s'
         '  <div class="ai-body">\n%s\n  </div>\n'
         '  <div class="take-label">我的心得</div>\n'
         '  <div class="my-take" contenteditable="true" data-id="%s" data-ph="%s"></div>\n'
-        '</section>' % (" mod" if is_module else "", esc(anchor), esc(title), body, esc(cid), esc(ph))
+        '</section>' % (" mod" if is_module else "", esc(anchor), esc(title),
+                        fig_block, body, esc(cid), esc(ph))
     )
 
 
@@ -273,17 +321,18 @@ def render_stage(diagram, svg):
             '</section>') % (title, svg, render_legend(diagram))
 
 
-def render_main(blocks, modules, stage_html, after):
+def render_main(blocks, modules, stage_html, after, content_dir):
     out = []
     inserted = False
     for b in blocks:
         if not b.get("id") or not b.get("title"):
             raise BuildError("[build_note] block 必须同时有 id 和 title: %r" % b)
+        fig_html = embed_figure(b.get("figure"), content_dir) if b.get("figure") else ""
         out.append(card(b["id"], b["title"], b.get("html", ""),
-                        b.get("ph") or DEFAULT_TAKE_PLACEHOLDER, False))
+                        b.get("ph") or DEFAULT_TAKE_PLACEHOLDER, False, fig_html))
         if after and b["id"] == after:
             out.append(stage_html)
-            out += module_cards(modules)
+            out += module_cards(modules, content_dir)
             inserted = True
 
     if stage_html and not inserted:
@@ -291,17 +340,18 @@ def render_main(blocks, modules, stage_html, after):
             print("[build_note] 警告: diagram.after='%s' 没匹配到任何 block，图已挪到正文末尾"
                   % after, file=sys.stderr)
         out.append(stage_html)
-        out += module_cards(modules)
+        out += module_cards(modules, content_dir)
     return "\n\n".join(out)
 
 
-def module_cards(modules):
+def module_cards(modules, content_dir):
     res = []
     for m in modules:
         if not m.get("id") or not m.get("title"):
             raise BuildError("[build_note] module 必须同时有 id 和 title: %r" % m)
+        fig_html = embed_figure(m.get("figure"), content_dir) if m.get("figure") else ""
         res.append(card(m["id"], m["title"], m.get("html", ""),
-                        m.get("ph") or DEFAULT_TAKE_PLACEHOLDER, True))
+                        m.get("ph") or DEFAULT_TAKE_PLACEHOLDER, True, fig_html))
     return res
 
 
@@ -321,6 +371,18 @@ def render_toc(blocks, modules, after):
 
 # ---------------------------------------------------------------- doc
 
+def _validate_figure(fig, ctx):
+    """校验 figure 字段格式。"""
+    if not isinstance(fig, dict):
+        raise BuildError("[build_note] %s.figure 必须是对象" % ctx)
+    if not fig.get("src"):
+        raise BuildError("[build_note] %s.figure 缺 src 字段" % ctx)
+    ext = os.path.splitext(fig["src"])[1].lower()
+    if ext and ext not in MIME_MAP:
+        raise BuildError("[build_note] %s.figure 的图片格式不支持: %s（可选: %s）"
+                         % (ctx, ext, ", ".join(sorted(MIME_MAP.keys()))))
+
+
 def validate(data):
     """集中校验 content.json 的完整性和一致性。"""
     meta = data.get("meta") or {}
@@ -337,10 +399,14 @@ def validate(data):
     for i, b in enumerate(blocks):
         if not b.get("id") or not b.get("title"):
             raise BuildError("[build_note] blocks[%d] 必须同时有 id 和 title" % i)
+        if b.get("figure"):
+            _validate_figure(b["figure"], "blocks[%d]" % i)
 
     for i, m in enumerate(modules):
         if not m.get("id") or not m.get("title"):
             raise BuildError("[build_note] modules[%d] 必须同时有 id 和 title" % i)
+        if m.get("figure"):
+            _validate_figure(m["figure"], "modules[%d]" % i)
 
     nodes = diagram.get("nodes") or []
     if nodes:
@@ -377,7 +443,7 @@ def validate(data):
                   % ", ".join(sorted(missing)), file=sys.stderr)
 
 
-def render(data):
+def render(data, content_dir="."):
     validate(data)
 
     meta = data.get("meta") or {}
@@ -446,7 +512,7 @@ ${js}
         meta=build_meta(meta),
         tags=build_tags(meta),
         toc=render_toc(blocks, modules, after if svg else None),
-        main=render_main(blocks, modules, stage_html, after),
+        main=render_main(blocks, modules, stage_html, after, content_dir),
         css=css,
         js=js,
         key=esc(note_key),
@@ -472,7 +538,8 @@ def main():
             except json.JSONDecodeError as e:
                 raise BuildError("[build_note] content.json 不是合法 JSON: %s" % e)
 
-        doc = render(data)
+        content_dir = os.path.dirname(os.path.abspath(args.content))
+        doc = render(data, content_dir)
 
         out_dir = os.path.dirname(os.path.abspath(args.out))
         if out_dir and not os.path.exists(out_dir):

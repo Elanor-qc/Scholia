@@ -220,6 +220,30 @@ body[data-theme="dark"] .btn.danger { color: #f09595; }
 
 .ai-body hr { border: none; border-top: 1px solid var(--border2); margin: 20px 0; }
 
+/* ---------- paper figures ---------- */
+
+.paper-fig {
+  margin: 0 0 16px;
+  padding: 12px;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  text-align: center;
+}
+.paper-fig img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 4px;
+}
+.paper-fig figcaption {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
 .flag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 4px; margin-right: 6px; vertical-align: 2px; }
 .flag.ok { background: var(--flag-ok-bg); color: var(--flag-ok-fg); }
 .flag.warn { background: var(--flag-warn-bg); color: var(--flag-warn-fg); }
@@ -279,5 +303,6 @@ body[data-theme="dark"] .btn.danger { color: #f09595; }
   .dg-wrap { overflow: visible; }
   .dg { width: 100% !important; min-width: 0 !important; height: auto !important; }
   .blk { page-break-inside: avoid; }
+  .paper-fig { break-inside: avoid; page-break-inside: avoid; background: none; border: 1px solid #ccc; }
   body { font-size: 11.5pt; }
 }

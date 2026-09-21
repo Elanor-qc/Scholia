@@ -403,6 +403,13 @@
     if (t === "h4") return "#### " + el.innerText.trim();
     if (t === "pre") return "```\n" + el.innerText + "\n```";
     if (t === "blockquote") return el.innerText.trim().split(/\r?\n/).map((l) => "> " + l).join("\n");
+    if (t === "figure") {
+      const img = el.querySelector("img");
+      const cap = el.querySelector("figcaption");
+      const src = img ? img.getAttribute("src") : "";
+      const alt = cap ? cap.innerText.trim() : "";
+      return src ? "![" + alt + "](" + src + ")" : alt;
+    }
     if (t === "ul" || t === "ol") {
       return Array.from(el.children).map((li, i) => {
         return (t === "ol" ? (i + 1) + ". " : "- ") + li.innerText.trim();
