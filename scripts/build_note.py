@@ -32,6 +32,7 @@ import json
 import os
 import re
 import sys
+from string import Template
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.join(os.path.dirname(HERE), "assets")
@@ -65,6 +66,11 @@ PAD = 16
 BUS_EXTRA = 30   # 回边通道额外高度
 
 
+class BuildError(Exception):
+    """构建过程中的可预期错误，消息直接展示给用户。"""
+    pass
+
+
 def esc(s):
     return html.escape(str(s), quote=False)
 
@@ -72,7 +78,7 @@ def esc(s):
 def load_asset(name):
     path = os.path.join(ASSETS, name)
     if not os.path.exists(path):
-        sys.exit("[build_note] 缺少资源文件: %s" % path)
+        raise BuildError("[build_note] 缺少资源文件: %s" % path)
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
@@ -121,11 +127,11 @@ def validate_diagram(d):
     for n in nodes:
         for f in ("id", "label", "col", "row"):
             if f not in n:
-                sys.exit("[build_note] diagram 节点缺字段 %s: %r" % (f, n))
+                raise BuildError("[build_note] diagram 节点缺字段 %s: %r" % (f, n))
         by_id[n["id"]] = n
     for e in d.get("edges") or []:
         if e.get("from") not in by_id or e.get("to") not in by_id:
-            sys.exit("[build_note] edges 引用了不存在的节点: %r" % e)
+            raise BuildError("[build_note] edges 引用了不存在的节点: %r" % e)
     return by_id
 
 
@@ -272,7 +278,7 @@ def render_main(blocks, modules, stage_html, after):
     inserted = False
     for b in blocks:
         if not b.get("id") or not b.get("title"):
-            sys.exit("[build_note] block 必须同时有 id 和 title: %r" % b)
+            raise BuildError("[build_note] block 必须同时有 id 和 title: %r" % b)
         out.append(card(b["id"], b["title"], b.get("html", ""),
                         b.get("ph") or DEFAULT_TAKE_PLACEHOLDER, False))
         if after and b["id"] == after:
@@ -293,7 +299,7 @@ def module_cards(modules):
     res = []
     for m in modules:
         if not m.get("id") or not m.get("title"):
-            sys.exit("[build_note] module 必须同时有 id 和 title: %r" % m)
+            raise BuildError("[build_note] module 必须同时有 id 和 title: %r" % m)
         res.append(card(m["id"], m["title"], m.get("html", ""),
                         m.get("ph") or DEFAULT_TAKE_PLACEHOLDER, True))
     return res
@@ -315,16 +321,69 @@ def render_toc(blocks, modules, after):
 
 # ---------------------------------------------------------------- doc
 
-def render(data):
+def validate(data):
+    """集中校验 content.json 的完整性和一致性。"""
     meta = data.get("meta") or {}
     diagram = data.get("diagram") or {}
     modules = data.get("modules") or []
     blocks = data.get("blocks") or []
+    valid_kinds = {k for k, _ in KINDS}
 
     if not meta.get("title"):
-        sys.exit("[build_note] meta.title 不能为空")
+        raise BuildError("[build_note] meta.title 不能为空")
     if not modules and not blocks:
-        sys.exit("[build_note] modules 与 blocks 不能同时为空")
+        raise BuildError("[build_note] modules 与 blocks 不能同时为空")
+
+    for i, b in enumerate(blocks):
+        if not b.get("id") or not b.get("title"):
+            raise BuildError("[build_note] blocks[%d] 必须同时有 id 和 title" % i)
+
+    for i, m in enumerate(modules):
+        if not m.get("id") or not m.get("title"):
+            raise BuildError("[build_note] modules[%d] 必须同时有 id 和 title" % i)
+
+    nodes = diagram.get("nodes") or []
+    if nodes:
+        seen_ids = set()
+        for i, n in enumerate(nodes):
+            for f in ("id", "label", "col", "row"):
+                if f not in n:
+                    raise BuildError("[build_note] diagram.nodes[%d] 缺字段 %s" % (i, f))
+            if not isinstance(n["col"], int) or n["col"] < 0:
+                raise BuildError("[build_note] 节点 '%s' 的 col 必须是非负整数" % n["id"])
+            if not isinstance(n["row"], int) or n["row"] < 0:
+                raise BuildError("[build_note] 节点 '%s' 的 row 必须是非负整数" % n["id"])
+            kind = n.get("kind", "proc")
+            if kind not in valid_kinds:
+                raise BuildError("[build_note] 节点 '%s' 的 kind '%s' 不合法，可选: %s"
+                                 % (n["id"], kind, ", ".join(sorted(valid_kinds))))
+            if n["id"] in seen_ids:
+                raise BuildError("[build_note] 节点 id '%s' 重复" % n["id"])
+            seen_ids.add(n["id"])
+
+        by_id = {n["id"]: n for n in nodes}
+        for i, e in enumerate(diagram.get("edges") or []):
+            if e.get("from") not in by_id or e.get("to") not in by_id:
+                raise BuildError("[build_note] edges[%d] 引用了不存在的节点" % i)
+
+        node_ids = set(n["id"] for n in nodes)
+        mod_ids = set(m["id"] for m in modules)
+        for m in modules:
+            if m["id"] not in node_ids:
+                raise BuildError("[build_note] module id '%s' 在 diagram.nodes 里找不到对应节点" % m["id"])
+        missing = node_ids - mod_ids
+        if missing:
+            print("[build_note] 警告: 这些图节点没有详解卡片, 点击会无反应: %s"
+                  % ", ".join(sorted(missing)), file=sys.stderr)
+
+
+def render(data):
+    validate(data)
+
+    meta = data.get("meta") or {}
+    diagram = data.get("diagram") or {}
+    modules = data.get("modules") or []
+    blocks = data.get("blocks") or []
 
     css = load_asset("note.css")
     js = load_asset("note.js")
@@ -336,38 +395,28 @@ def render(data):
     stage_html = render_stage(diagram, svg) if svg else ""
     after = diagram.get("after")
 
-    if svg:
-        node_ids = set(n["id"] for n in diagram["nodes"])
-        for m in modules:
-            if m["id"] not in node_ids:
-                sys.exit("[build_note] module id '%s' 在 diagram.nodes 里找不到对应节点" % m["id"])
-        missing = [i for i in node_ids if i not in set(m["id"] for m in modules)]
-        if missing:
-            print("[build_note] 警告: 这些图节点没有详解卡片, 点击会无反应: %s"
-                  % ", ".join(missing), file=sys.stderr)
-
     body_cls = "with-dg" if svg else "no-dg"
 
-    doc = """<!DOCTYPE html>
+    tpl = Template("""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>%(title)s</title>
+<title>${title}</title>
 <style>
-%(css)s
+${css}
 </style>
 </head>
-<body class="%(body_cls)s" data-theme="light" data-note-key="%(key)s">
+<body class="${body_cls}" data-theme="light" data-note-key="${key}">
 <div class="wrap">
   <header>
-    <div class="eyebrow">论文%(depth)s笔记</div>
-    <h1 class="title">%(title)s</h1>
-    %(title_zh)s
+    <div class="eyebrow">论文${depth}笔记</div>
+    <h1 class="title">${title}</h1>
+    ${title_zh}
     <div class="meta">
-      %(meta)s
+      ${meta}
     </div>
-    %(tags)s
+    ${tags}
     <div class="toolbar">
       <button class="btn" id="btn-html" type="button">导出 HTML</button>
       <button class="btn" id="btn-md" type="button">导出 Markdown</button>
@@ -380,29 +429,30 @@ def render(data):
   </header>
 
   <main class="main">
-%(toc)s
-%(main)s
+${toc}
+${main}
   </main>
 </div>
 <div class="toast" id="toast"></div>
 <script>
-%(js)s
+${js}
 </script>
 </body>
 </html>
-""" % {
-        "title": esc(meta["title"]),
-        "title_zh": title_zh,
-        "meta": build_meta(meta),
-        "tags": build_tags(meta),
-        "toc": render_toc(blocks, modules, after if svg else None),
-        "main": render_main(blocks, modules, stage_html, after),
-        "css": css,
-        "js": js,
-        "key": esc(note_key),
-        "depth": esc(depth),
-        "body_cls": body_cls,
-    }
+""")
+    doc = tpl.safe_substitute(
+        title=esc(meta["title"]),
+        title_zh=title_zh,
+        meta=build_meta(meta),
+        tags=build_tags(meta),
+        toc=render_toc(blocks, modules, after if svg else None),
+        main=render_main(blocks, modules, stage_html, after),
+        css=css,
+        js=js,
+        key=esc(note_key),
+        depth=esc(depth),
+        body_cls=body_cls,
+    )
     return doc
 
 
@@ -412,27 +462,30 @@ def main():
     ap.add_argument("--out", required=True, help="输出 HTML 路径")
     args = ap.parse_args()
 
-    if not os.path.exists(args.content):
-        sys.exit("[build_note] 找不到内容文件: %s" % args.content)
+    try:
+        if not os.path.exists(args.content):
+            raise BuildError("[build_note] 找不到内容文件: %s" % args.content)
 
-    with open(args.content, "r", encoding="utf-8") as f:
-        try:
-            data = json.load(f)
-        except json.JSONDecodeError as e:
-            sys.exit("[build_note] content.json 不是合法 JSON: %s" % e)
+        with open(args.content, "r", encoding="utf-8") as f:
+            try:
+                data = json.load(f)
+            except json.JSONDecodeError as e:
+                raise BuildError("[build_note] content.json 不是合法 JSON: %s" % e)
 
-    doc = render(data)
+        doc = render(data)
 
-    out_dir = os.path.dirname(os.path.abspath(args.out))
-    if out_dir and not os.path.exists(out_dir):
-        os.makedirs(out_dir, exist_ok=True)
+        out_dir = os.path.dirname(os.path.abspath(args.out))
+        if out_dir and not os.path.exists(out_dir):
+            os.makedirs(out_dir, exist_ok=True)
 
-    with open(args.out, "w", encoding="utf-8") as f:
-        f.write(doc)
+        with open(args.out, "w", encoding="utf-8") as f:
+            f.write(doc)
 
-    print("[build_note] 已生成: %s (%d 字节, %d 个节点卡片, %d 个通用板块)"
-          % (os.path.abspath(args.out), len(doc.encode("utf-8")),
-             len(data.get("modules") or []), len(data.get("blocks") or [])))
+        print("[build_note] 已生成: %s (%d 字节, %d 个节点卡片, %d 个通用板块)"
+              % (os.path.abspath(args.out), len(doc.encode("utf-8")),
+                 len(data.get("modules") or []), len(data.get("blocks") or [])))
+    except BuildError as e:
+        sys.exit(str(e))
 
 
 if __name__ == "__main__":

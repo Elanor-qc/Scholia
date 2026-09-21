@@ -26,6 +26,10 @@ html { -webkit-text-size-adjust: 100%; }
   --dg-sub: #57606a;
   --dg-edge: #97a0aa;
   --dg-elabel: #6e7781;
+
+  --flag-ok-bg: #e6f4ea;  --flag-ok-fg: #1a7f37;
+  --flag-warn-bg: #fff8e5; --flag-warn-fg: #9a6700;
+  --flag-risk-bg: #fdf0ef; --flag-risk-fg: #a32d2d;
 }
 
 body[data-theme="dark"] {
@@ -50,6 +54,10 @@ body[data-theme="dark"] {
   --dg-sub: #9198a1;
   --dg-edge: #5a636d;
   --dg-elabel: #9198a1;
+
+  --flag-ok-bg: #12331d;  --flag-ok-fg: #7ee2a8;
+  --flag-warn-bg: #33290f; --flag-warn-fg: #f0c674;
+  --flag-risk-bg: #3a1614; --flag-risk-fg: #ffa198;
 }
 
 body {
@@ -213,12 +221,9 @@ body[data-theme="dark"] .btn.danger { color: #f09595; }
 .ai-body hr { border: none; border-top: 1px solid var(--border2); margin: 20px 0; }
 
 .flag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 4px; margin-right: 6px; vertical-align: 2px; }
-.flag.ok { background: #e6f4ea; color: #1a7f37; }
-.flag.warn { background: #fff8e5; color: #9a6700; }
-.flag.risk { background: #fdf0ef; color: #a32d2d; }
-body[data-theme="dark"] .flag.ok { background: #12331d; color: #7ee2a8; }
-body[data-theme="dark"] .flag.warn { background: #33290f; color: #f0c674; }
-body[data-theme="dark"] .flag.risk { background: #3a1614; color: #ffa198; }
+.flag.ok { background: var(--flag-ok-bg); color: var(--flag-ok-fg); }
+.flag.warn { background: var(--flag-warn-bg); color: var(--flag-warn-fg); }
+.flag.risk { background: var(--flag-risk-bg); color: var(--flag-risk-fg); }
 
 /* ---------- my take ---------- */
 

@@ -16,14 +16,27 @@ window.scrollY、目标 getBoundingClientRect().top、当前高亮的节点 id�
 import argparse
 import os
 import re
+import shutil
 import subprocess
 import sys
 
 CANDIDATE_BROWSERS = [
+    # Windows
     r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
     r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",
     r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    # macOS
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    # Linux
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/google-chrome",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/chromium",
+    "/usr/bin/microsoft-edge-stable",
+    "/usr/bin/microsoft-edge",
 ]
 
 PROBE = """
@@ -73,6 +86,11 @@ def find_browser(explicit=None):
     for p in CANDIDATE_BROWSERS:
         if os.path.exists(p):
             return p
+    for name in ("google-chrome", "google-chrome-stable", "chromium-browser",
+                 "chromium", "microsoft-edge-stable", "microsoft-edge", "chrome"):
+        found = shutil.which(name)
+        if found:
+            return found
     sys.exit("[smoke] 没找到 Edge 或 Chrome，用 --browser 指定路径")
 
 
