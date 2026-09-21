@@ -24,11 +24,21 @@
 
 ## 安装
 
-作为 WorkBuddy skill 使用，把整个目录放到 skill 目录下：
+Scholia 是一份 **agent-agnostic** 的 skill——任何支持自定义指令 / skill 的 AI 编程工具都能用（Claude Code、Codex、WorkBuddy、Qoder 等）。
 
-```bash
-cp -r scholia ~/.workbuddy/skills/scholia
-```
+把整个目录放到你的工具所对应的 skill 目录即可。常见位置：
+
+| 工具 | 放置方式 |
+|---|---|
+| Claude Code | 项目根目录放 `SKILL.md`，或加入 `.claude/` 配置 |
+| Codex | 按 Codex skill 约定放置 |
+| WorkBuddy | `cp -r scholia ~/.workbuddy/skills/scholia` |
+| Qoder | 项目根目录放 `SKILL.md` |
+
+核心是两件事：
+
+1. **让 agent 能读到 `SKILL.md`**——这是给 AI 的工作指令，告诉它怎么读论文、怎么生成 content.json、怎么调构建脚本
+2. **让 agent 能执行 `scripts/build_note.py`**——这是实际干活的路径无关的 Python 脚本
 
 之后直接对 agent 说「读下这篇论文」并给出本地 PDF 路径或 arXiv 链接即可触发，不用点名。
 

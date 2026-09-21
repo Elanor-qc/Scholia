@@ -35,7 +35,7 @@ curl -s "http://export.arxiv.org/api/query?id_list=<ID>" -o <工作目录>/arxiv
 curl -sL "https://arxiv.org/pdf/<ID>.pdf" -o "<工作目录>/paper.pdf"
 ```
 
-**B. 本地 PDF**：直接 Read 工具读（支持 PDF）。
+**B. 本地 PDF**：直接用 agent 的文件读取能力打开（多数工具支持 PDF）。
 
 省 token 策略：先读摘要页 + 方法章节 + 实验表格页 + 图表密集页，需要再补读。别一上来把 20 页全读进上下文。抓不到就报告问题，不许凭标题摘要硬编。
 
@@ -102,12 +102,15 @@ curl -sL "https://arxiv.org/pdf/<ID>.pdf" -o "<工作目录>/paper.pdf"
 
 ### 第 4 步：构建 HTML
 
+找到本 skill 目录下的 `scripts/build_note.py`，用任意 Python 3 执行：
+
 ```bash
-"C:/Users/elanorgao/.workbuddy/binaries/python/versions/3.13.12/python.exe" \
-  "C:/Users/elanorgao/.workbuddy/skills/scholia/scripts/build_note.py" \
+python <skill目录>/scripts/build_note.py \
   --content "<工作目录>/content.json" \
   --out "<工作目录>/<论文简称>-精读笔记.html"
 ```
+
+> **路径说明**：`<skill目录>` 是 `SKILL.md` 所在的目录（即 `build_note.py` 的父目录的父目录）。如果你不确定路径，先 `find` 或 `ls` 定位一下。
 
 脚本会做：schema 校验（节点字段、边引用、module↔node 对应）、手写路由、CSS/JS 内联。报错信息带具体字段，照着改即可。
 
@@ -116,9 +119,7 @@ curl -sL "https://arxiv.org/pdf/<ID>.pdf" -o "<工作目录>/paper.pdf"
 改过 `note.css` / `note.js` / `build_note.py` 之后，跑一次冒烟，别靠肉眼点：
 
 ```bash
-"C:/Users/elanorgao/.workbuddy/binaries/python/versions/3.13.12/python.exe" \
-  "C:/Users/elanorgao/.workbuddy/skills/scholia/scripts/smoke_test.py" \
-  "<刚生成的 html>"
+python <skill目录>/scripts/smoke_test.py "<刚生成的 html>"
 ```
 
 它会逐个点击图上每个节点，检查两件事——落点是否对准（top≈24）、高亮有没有串到别的节点——逐条打印 PASS/FAIL。全绿再交付，有一行红就先修。
@@ -127,7 +128,7 @@ curl -sL "https://arxiv.org/pdf/<ID>.pdf" -o "<工作目录>/paper.pdf"
 
 ### 第 6 步：交付
 
-用 present_files 打开。口头总结三段：这篇最值得注意的一点、和你研究方向的关系、哪些地方标注了不确定需要核对。
+把生成的 HTML 文件交付给用户（直接打开、或用工具呈现均可）。口头总结三段：这篇最值得注意的一点、和用户研究方向的关系、哪些地方标注了不确定需要核对。
 
 ## 改代码前先读这个
 
@@ -141,10 +142,12 @@ curl -sL "https://arxiv.org/pdf/<ID>.pdf" -o "<工作目录>/paper.pdf"
 2. **禁止注水**——「本文具有重要意义」这类话一句都不许出现。
 3. **禁止替用户写心得**——`.my-take` 永远留空。
 
-## 用户背景
+## 用户背景（按需填写）
 
-用户 Elanor 在做 **3dgsVAE**（3D Gaussian Splatting + VAE），关注表示的结构性、latent 空间的可编码性、压缩与生成，不是渲染速度。她要求**大白话优先**：先讲清楚在干嘛，再上公式数字。
+> 这一段留给用户自己写，或者在首次使用时通过对话收集。示例：
+>
+> 用户在做 **3dgsVAE**（3D Gaussian Splatting + VAE），关注表示的结构性、latent 空间的可编码性、压缩与生成，不是渲染速度。要求**大白话优先**：先讲清楚在干嘛，再上公式数字。
 
 ## 角色边界
 
-我是她的秘书，不是决策者。笔记里的判断可以写，但要标明是判断；遇到「值不值得复现」「要不要改方向」这类要她拍板的问题，写进「与我研究的关联」的待议项，不替她下结论。
+agent 是用户的秘书，不是决策者。笔记里的判断可以写，但要标明是判断；遇到「值不值得复现」「要不要改方向」这类要用户拍板的问题，写进「与我研究的关联」的待议项，不替用户下结论。
