@@ -50,7 +50,6 @@ META_FIELDS = [
     ("arxiv", "arXiv", False),
     ("url", "原文", True),
     ("code", "代码", True),
-    ("date", "阅读于", False),
 ]
 
 KINDS = [
@@ -469,6 +468,7 @@ def render(data, content_dir="."):
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title>
+<link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/KaTeX/0.16.11/katex.min.css">
 <style>
 ${css}
 </style>
@@ -502,6 +502,13 @@ ${main}
 <div class="toast" id="toast"></div>
 <script>
 ${js}
+</script>
+<script src="https://cdn.bootcdn.net/ajax/libs/KaTeX/0.16.11/katex.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/KaTeX/0.16.11/contrib/auto-render.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  renderMathInElement(document.body, {delimiters:[{left:'$$$$',right:'$$$$',display:true},{left:'$',right:'$',display:false}], throwOnError:false});
+});
 </script>
 </body>
 </html>

@@ -9,29 +9,112 @@
     "url": "https://arxiv.org/abs/2308.04079",
     "code": "https://github.com/graphdeco-inria/gaussian-splatting",
     "date": "2026-09-18",
-    "tags": ["3DGS", "辐射场", "实时渲染", "显式表示", "novel view synthesis"],
+    "tags": [
+      "3DGS",
+      "辐射场",
+      "实时渲染",
+      "显式表示",
+      "novel view synthesis"
+    ],
     "depth": "精读"
   },
   "diagram": {
     "title": "方法管线",
     "after": "problem",
     "nodes": [
-      {"id": "sfm", "label": "SfM 点云", "sub": "COLMAP 输出", "kind": "io", "col": 0, "row": 0},
-      {"id": "init", "label": "高斯初始化", "sub": "位置/尺度/旋转", "kind": "proc", "col": 1, "row": 0},
-      {"id": "gauss", "label": "各向异性高斯", "sub": "Σ = R S Sᵀ Rᵀ", "kind": "latent", "col": 2, "row": 0},
-      {"id": "raster", "label": "Tile 光栅化", "sub": "16×16 tile", "kind": "proc", "col": 3, "row": 0},
-      {"id": "image", "label": "渲染图像", "sub": "α-blending", "kind": "io", "col": 4, "row": 0},
-      {"id": "density", "label": "密度控制", "sub": "分裂/克隆/删除", "kind": "aux", "col": 2, "row": 1},
-      {"id": "loss", "label": "重建损失", "sub": "L1 + D-SSIM", "kind": "loss", "col": 4, "row": 1}
+      {
+        "id": "sfm",
+        "label": "SfM 点云",
+        "sub": "COLMAP 输出",
+        "kind": "io",
+        "col": 0,
+        "row": 0
+      },
+      {
+        "id": "init",
+        "label": "高斯初始化",
+        "sub": "位置/尺度/旋转",
+        "kind": "proc",
+        "col": 1,
+        "row": 0
+      },
+      {
+        "id": "gauss",
+        "label": "各向异性高斯",
+        "sub": "Σ = R S Sᵀ Rᵀ",
+        "kind": "latent",
+        "col": 2,
+        "row": 0
+      },
+      {
+        "id": "raster",
+        "label": "Tile 光栅化",
+        "sub": "16×16 tile",
+        "kind": "proc",
+        "col": 3,
+        "row": 0
+      },
+      {
+        "id": "image",
+        "label": "渲染图像",
+        "sub": "α-blending",
+        "kind": "io",
+        "col": 4,
+        "row": 0
+      },
+      {
+        "id": "density",
+        "label": "密度控制",
+        "sub": "分裂/克隆/删除",
+        "kind": "aux",
+        "col": 2,
+        "row": 1
+      },
+      {
+        "id": "loss",
+        "label": "重建损失",
+        "sub": "L1 + D-SSIM",
+        "kind": "loss",
+        "col": 4,
+        "row": 1
+      }
     ],
     "edges": [
-      {"from": "sfm", "to": "init", "label": "种子点"},
-      {"from": "init", "to": "gauss", "label": "初始化"},
-      {"from": "gauss", "to": "raster", "label": "投影"},
-      {"from": "raster", "to": "image", "label": "累积"},
-      {"from": "gauss", "to": "density", "label": "位置梯度"},
-      {"from": "density", "to": "gauss", "label": "回写"},
-      {"from": "image", "to": "loss", "label": "监督"}
+      {
+        "from": "sfm",
+        "to": "init",
+        "label": "种子点"
+      },
+      {
+        "from": "init",
+        "to": "gauss",
+        "label": "初始化"
+      },
+      {
+        "from": "gauss",
+        "to": "raster",
+        "label": "投影"
+      },
+      {
+        "from": "raster",
+        "to": "image",
+        "label": "累积"
+      },
+      {
+        "from": "gauss",
+        "to": "density",
+        "label": "位置梯度"
+      },
+      {
+        "from": "density",
+        "to": "gauss",
+        "label": "回写"
+      },
+      {
+        "from": "image",
+        "to": "loss",
+        "label": "监督"
+      }
     ]
   },
   "modules": [
@@ -43,7 +126,7 @@
     {
       "id": "init",
       "title": "初始化：从点云到高斯",
-      "html": "<p>每个点变成一个三维高斯，拿到四组参数：中心 <code>μ</code>、协方差 <code>Σ</code>、不透明度 <code>α</code>、球谐系数 <code>SH</code>。</p><p>协方差不直接优化矩阵元素，而是拆成缩放矩阵和旋转矩阵的乘积 <code>Σ = R S Sᵀ Rᵀ</code>，优化 scale 向量和四元数——这样能保证半正定性，不会出现「协方差矩阵跑歪了」的情况。</p>"
+      "html": "<p>每个点变成一个三维高斯，拿到四组参数：中心 $\\mu$、协方差 $\\Sigma$、不透明度 $\u0007lpha$、球谐系数 <code>SH</code>。</p><p>协方差不直接优化矩阵元素，而是拆成缩放矩阵和旋转矩阵的乘积 $\\Sigma = R S S^\top R^\top$，优化 scale 向量和四元数——这样能保证半正定性，不会出现「协方差矩阵跑歪了」的情况。</p>"
     },
     {
       "id": "gauss",
@@ -106,11 +189,6 @@
       "id": "reproduce",
       "title": "可复刻性",
       "html": "<p><span class=\"flag ok\">代码开源</span>官方实现 <code>graphdeco-inria/gaussian-splatting</code>，社区生态极大。</p><ul><li><strong>数据</strong>：公开数据集为主；自定义数据需要自己跑 COLMAP，这是主要工程成本。</li><li><strong>算力</strong>：单张 24GB 显存卡可跑通标准场景；显存不足时高斯数量被迫下调，质量随之下降。</li><li><strong>环境</strong>：依赖自定义 CUDA 算子（diff-gaussian-rasterization），版本敏感，装环境是常见坑点。</li><li><strong>时间</strong>：跑通官方 demo 约半小时；改内核要读光栅化源码，门槛陡增。</li></ul><p>要抄的模块排序（从易到难）：不透明度重置 → 密度控制策略 → SH 颜色 → 光栅化内核。</p>"
-    },
-    {
-      "id": "relevance",
-      "title": "与我研究的关联",
-      "html": "<p><strong>针对 3dgsVAE 的背景，这里是最值得警惕的一点：</strong>3DGS 的本质是一个<em>无序、可变长</em>的基元集合——这对 VAE 非常不友好。标准编码器要么需要固定长度输入，要么需要一个规整的网格/序列结构，而高斯点云两样都没有。</p><h4>可能的切入点</h4><ul><li><strong>结构化锚点</strong>：像 Scaffold-GS 那样把高斯挂在体素/anchor 网格上，让 latent 有空间对应关系，编码器就能用 3D 卷积。</li><li><strong>per-splat latent + 集合编码</strong>：把每个高斯的属性当 token，用 PointNet / Set Transformer 聚合，天然处理置换不变性。</li><li><strong>先压成规整再压 latent</strong>：3DGS → triplane / hash grid → VAE，绕开集合结构问题，代价是丢掉部分显式可解释性。</li></ul><h4>可能不相关</h4><p>这篇的渲染速度优势，在「做生成/压缩」的语境下并不直接迁移——我们在意的是 latent 空间的紧凑和解耦，不是能否 30fps 出图。别被实时性带偏。</p><h4>待你拍板</h4><p>上面三条切入点走哪条，取决于你更在意 latent 的可解释性还是压缩率。我没有替你选。</p>"
     }
   ]
 }

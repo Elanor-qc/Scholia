@@ -1,0 +1,170 @@
+{
+  "meta": {
+    "title": "MonoSDF: Exploring Monocular Geometric Cues for Neural Implicit Surface Reconstruction",
+    "title_zh": "MonoSDF：探索单目几何先验用于神经隐式曲面重建",
+    "authors": "Zehao Yu, Songyou Peng, Michael Niemeyer, Torsten Sattler, Andreas Geiger",
+    "affiliation": "University of Tübingen, ETH Zurich, MPI for Intelligent Systems, Czech Technical University in Prague",
+    "venue": "NeurIPS 2022",
+    "arxiv": "2206.00665",
+    "url": "https://niujinshuchong.github.io/monosdf/",
+    "code": "",
+    "tags": [
+      "3D重建",
+      "神经隐式表示",
+      "SDF",
+      "单目深度",
+      "单目法向",
+      "体渲染"
+    ],
+    "depth": "精读"
+  },
+  "diagram": {
+    "title": "方法管线",
+    "after": "problem",
+    "nodes": [
+      {
+        "id": "input",
+        "label": "多视角图像",
+        "sub": "带位姿的RGB图",
+        "kind": "io",
+        "col": 0,
+        "row": 0
+      },
+      {
+        "id": "mono",
+        "label": "单目几何预测",
+        "sub": "Omnidata: 深度+法向",
+        "kind": "aux",
+        "col": 1,
+        "row": 1
+      },
+      {
+        "id": "implicit",
+        "label": "神经隐式SDF",
+        "sub": "MLP / 特征网格",
+        "kind": "latent",
+        "col": 2,
+        "row": 0
+      },
+      {
+        "id": "render",
+        "label": "可微体渲染",
+        "sub": "RGB / 深度 / 法向",
+        "kind": "proc",
+        "col": 3,
+        "row": 0
+      },
+      {
+        "id": "loss",
+        "label": "多目标损失",
+        "sub": "RGB+深度+法向+Eikonal",
+        "kind": "loss",
+        "col": 4,
+        "row": 0
+      }
+    ],
+    "edges": [
+      {
+        "from": "input",
+        "to": "implicit",
+        "label": "坐标查询"
+      },
+      {
+        "from": "input",
+        "to": "mono",
+        "label": "单目预测"
+      },
+      {
+        "from": "mono",
+        "to": "loss",
+        "label": "深度/法向监督"
+      },
+      {
+        "from": "implicit",
+        "to": "render",
+        "label": "SDF值"
+      },
+      {
+        "from": "render",
+        "to": "loss",
+        "label": "渲染结果"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "id": "input",
+      "title": "输入：多视角带位姿图像",
+      "html": "<p>给定一组带相机位姿的 RGB 图像 $\\{I_k, P_k\\}$，作为整个管线的输入。每张图像既用于后续的体渲染重建损失，也作为单目几何预测网络的输入。</p><p>论文在三个尺度上验证方法：<strong>物体级</strong>（DTU，3 视图稀疏输入 / 全视图密集输入）、<strong>房间级</strong>（Replica、ScanNet）、<strong>大尺度室内场景</strong>（Tanks & Temples advanced）。输入图像的分辨率在实验中被统一缩放到 384×384 用于单目预测。</p>"
+    },
+    {
+      "id": "mono",
+      "title": "单目几何预测：Omnidata",
+      "html": "<p>使用预训练的 <strong>Omnidata</strong> 模型（Deka et al. 2021）对每张输入图像独立预测：</p><ul><li><strong>深度图</strong> $\\bar{D}$：提供半局部的相对深度信息，能覆盖图像中较大范围的几何结构</li><li><strong>法向图</strong> $\\bar{N}$：提供局部几何细节，对纹理缺失区域（如墙面）也能可靠预测</li></ul><p>两者互补：深度给出整体结构，法向补充局部细节。由于单目深度只有相对尺度，后续需要通过最小二乘估计尺度 $w$ 和平移 $q$ 来对齐渲染深度与预测深度。</p><p>Omnidata 在大规模数据集上训练，泛化能力强，不需要针对特定场景微调，这是它能作为通用先验的关键。</p>",
+      "figure": {
+        "src": "fig2_framework.png",
+        "caption": "图 2：MonoSDF 框架概览。上方展示四种神经隐式表示架构（MLP、Dense SDF Grid、Single-res Feature Grid、Multi-res Feature Grids），下方展示单目几何预测与体渲染的联合优化流程。"
+      }
+    },
+    {
+      "id": "implicit",
+      "title": "神经隐式 SDF 表示",
+      "html": "<p>场景几何用有符号距离函数（SDF）表示：$f(\\mathbf{x}) \\to s$，输入 3D 点返回到最近表面的距离。论文系统比较了四种参数化方式：</p><ul><li><strong>Dense SDF Grid</strong>：直接在体素网格中存储 SDF 值，三线性插值查询。缺乏平滑先验，重建噪声大</li><li><strong>Single MLP</strong>：用位置编码 + MLP 直接预测 SDF。全局平滑偏置强，但优化和推理慢</li><li><strong>Single-Res Feature Grid</strong>：网格存储低维特征向量，MLP 解码器读取特征后预测 SDF。兼顾效率和表达能力</li><li><strong>Multi-Res Feature Grids</strong>：多分辨率特征网格（从粗到细），用空间哈希索引细层。表达能力最强，收敛最快，细节最好</li></ul><p>关键发现：不加单目先验时 Multi-Res Grids 最优；加入单目先验后 MLP 和 Grids 差距缩小，MLP 因全局平滑偏置在噪声数据（ScanNet）上反而更鲁棒。</p>",
+      "figure": {
+        "src": "fig3_arch_ablation.png",
+        "caption": "图 3：架构消融实验。Dense SDF Grid 因缺少平滑偏置导致噪声重建；MLP 和 Single-Res Grid 结果偏光滑丢失细节；Multi-Res Grids 效果最好。"
+      }
+    },
+    {
+      "id": "render",
+      "title": "可微体渲染",
+      "html": "<p>沿相机射线采样 M 个点，用 SDF→密度的转换公式（VolSDF 的 β 参数化）将 SDF 值转为体密度：</p><p>$$\\sigma_\\beta(s) = \\begin{cases} \\frac{1}{2\\beta}\\exp(s/\\beta), & s \\le 0 \\\\ \\frac{1}{\\beta}\\left(1 - \\frac{1}{2}\\exp(-s/\\beta)\\right), & s > 0 \\end{cases}$$</p><p>然后按 NeRF 的体渲染公式积分，得到像素的 <strong>渲染颜色 $\\tilde{C}(r)$</strong>、<strong>渲染深度 $\\tilde{D}(r)$</strong> 和 <strong>渲染法向 $\\tilde{N}(r)$</strong>：</p><p>$$\\tilde{C}(r) = \\sum_i T_i \\alpha_i \\mathbf{c}_i, \\quad \\tilde{D}(r) = \\sum_i T_i \\alpha_i t_i, \\quad \\tilde{N}(r) = \\sum_i T_i \\alpha_i \\hat{\\mathbf{n}}_i$$</p><p>其中 $T_i$ 是累积透射率，$\\alpha_i$ 是不透明度，$\\hat{\\mathbf{n}}_i$ 是 SDF 的解析梯度（即表面法向）。这样一条射线同时产出三种可监督的信号，为后续多目标损失奠定基础。</p>"
+    },
+    {
+      "id": "loss",
+      "title": "多目标损失与优化",
+      "html": "<p>总损失由四项组成：</p><p>$$L = L_{rgb} + \\lambda_1 L_{eikonal} + \\lambda_2 L_{depth} + \\lambda_3 L_{normal}$$</p><ul><li><strong>L_rgb</strong>（L1）：渲染颜色与输入图像的光度一致性</li><li><strong>L_eikonal</strong>：约束 SDF 梯度模长为 1，保证 SDF 的数学性质</li><li><strong>L_depth</strong>（L2）：渲染深度与单目预测深度的一致性，含可学习的尺度 $w$ 和平移 $q$（每 batch 用最小二乘求解）</li><li><strong>L_normal</strong>（L1 + 角度损失）：渲染法向与单目预测法向的一致性</li></ul><p>权重设为 $\\lambda_1=0.1$, $\\lambda_2=0.1$, $\\lambda_3=0.05$。优化器用 Adam，网络学习率 5e-4，特征网格 1e-2，每迭代采样 1024 条射线，配合 VolSDF 的误差有界采样策略。</p><p>关键效果：加入单目先验后，收敛速度大幅提升——仅 10K 迭代就超过无先验模型的最终结果。</p>",
+      "figure": {
+        "src": "fig4_cue_ablation.png",
+        "caption": "图 4：单目几何先验消融。无先验时重建粗糙；加深度先验改善整体结构；加法向先验补充细节使表面更光滑；两者结合效果最佳。右侧曲线显示加入先验后收敛显著加速。"
+      }
+    }
+  ],
+  "blocks": [
+    {
+      "id": "tldr",
+      "title": "一句话结论",
+      "html": "<p>用预训练的单目深度/法向估计器（Omnidata）产生的几何先验作为额外监督信号，可以显著提升神经隐式曲面重建的质量、收敛速度和场景可扩展性，且与底层表示架构（MLP 或特征网格）无关。</p>"
+    },
+    {
+      "id": "problem",
+      "title": "要解决什么问题",
+      "html": "<p>现有神经隐式曲面重建方法（VolSDF、NeuS、UNISURF 等）在<strong>简单场景 + 密集视角</strong>下效果很好，但在以下情况性能急剧下降：</p><ul><li><strong>稀疏视角</strong>：如 DTU 仅 3 个输入视图</li><li><strong>大尺度复杂场景</strong>：如 Tanks & Temples、ScanNet</li><li><strong>弱纹理区域</strong>：墙面、天花板等缺乏纹理的区域</li></ul><p>根本原因：仅靠 RGB 光度一致性损失是一个<strong>欠约束问题</strong>——存在无穷多个光度一致的 3D 解释。在弱纹理和少观测区域，RGB 损失无法提供足够的几何约束。</p><p>已有工作尝试加入深度平滑、表面平滑、语义相似性、Manhattan 世界等先验，但要么需要场景特定假设，要么管线复杂。本文的核心问题是：<strong>能否用现成的、通用的单目几何预测器作为即插即用的先验，统一改善各种神经隐式表示的重建质量？</strong></p>"
+    },
+    {
+      "id": "experiments",
+      "title": "实验与结果",
+      "html": "<h4>物体级重建（DTU）</h4><p><strong>稀疏视角（3 views）：</strong>无先验时 MLP 和 Grids 都失败；加入单目先验后两者都大幅改善。MLP（1.86 Chamfer）优于 Grids（3.68），因为 MLP 的全局平滑偏置在稀疏数据下更有利。</p><p><strong>密集视角（全视图）：</strong>MLP 与 VolSDF/NeuS 持平（0.84 vs 0.86），Grids 大幅超越所有基线（0.73），因为多分辨率网格的表达能力在密集约束下充分发挥。</p><h4>场景级重建（ScanNet）</h4><p>MLP 变体以 Chamfer 0.042、F-score 0.733 全面超越所有基线（包括 concurrent work NeuRIS）。MLP 对 ScanNet 的运动模糊和噪声位姿更鲁棒，Grids 因局部更新受噪声影响更大。</p><h4>大尺度场景（Tanks & Temples）</h4><p>MonoSDF 是<strong>首个</strong>在此类大尺度室内场景上取得合理结果的神经隐式模型，VolSDF 加入单目先验后质量飞跃。</p><h4>与经典方法对比</h4><p>COLMAP 在稀疏视角下定量不错但重建不完整（依赖密集匹配）；TSDF-Fusion 直接用单目深度融合则因深度不一致导致细节丢失。MonoSDF 结合了隐式表示的连续性和单目先验的几何约束，两者互补。</p>"
+    },
+    {
+      "id": "ablation",
+      "title": "消融",
+      "html": "<h4>架构消融（Replica，无单目先验）</h4><table><tr><th>表示</th><th>Normal C.↑</th><th>Chamfer↓</th><th>F-score↑</th></tr><tr><td>MLP</td><td>86.48</td><td>6.75</td><td>66.88</td></tr><tr><td>Dense SDF Grid</td><td>57.30</td><td>26.68</td><td>15.50</td></tr><tr><td>Single-Res Grid</td><td>86.41</td><td>6.28</td><td>64.22</td></tr><tr><td>Multi-Res Grids</td><td>87.95</td><td>5.03</td><td>78.38</td></tr></table><p>Dense Grid 最差（无平滑偏置）；MLP 和 Single-Res Grid 相当但偏光滑；Multi-Res Grids 最优。</p><h4>单目先验消融</h4><table><tr><th>配置</th><th>Normal C.↑</th><th>Chamfer↓</th><th>F-score↑</th></tr><tr><td>MLP 无先验</td><td>86.48</td><td>6.75</td><td>66.88</td></tr><tr><td>MLP + Depth</td><td>90.56</td><td>4.26</td><td>76.42</td></tr><tr><td>MLP + Normal</td><td>91.35</td><td>3.19</td><td>85.84</td></tr><tr><td>MLP + Both</td><td><strong>92.11</strong></td><td><strong>2.94</strong></td><td><strong>86.18</strong></td></tr></table><p>深度和法向互补，两者结合最优。加入先验后 MLP 和 Grids 差距显著缩小，说明单目先验是通用的 drop-in 改进。</p><h4>收敛速度</h4><p>加入单目先验后，两种架构都在 10K 迭代内超过无先验模型的最终结果。Grids 收敛更快，但 MLP + 双先验最终精度最高。</p>"
+    },
+    {
+      "id": "contribution",
+      "title": "创新点",
+      "html": "<ul><li><strong>首个系统性研究</strong>单目几何先验（深度+法向）对神经隐式曲面重建的影响，覆盖从物体级到大尺度场景的多种设置</li><li><strong>即插即用</strong>：Omnidata 预训练模型无需微调，直接作为通用先验嵌入任意神经隐式表示</li><li><strong>架构无关</strong>：先验对 MLP、Dense Grid、Single-Res Grid、Multi-Res Grids 均有显著提升，加入后架构间差距缩小</li><li><strong>四架构系统对比</strong>：在同一框架下公平比较了四种主流神经隐式表示的设计选择，给出了清晰的优劣分析</li><li><strong>收敛加速</strong>：单目先验不仅提升最终质量，还大幅缩短优化时间</li></ul>"
+    },
+    {
+      "id": "limits",
+      "title": "局限与疑点",
+      "html": "<ul><li><strong>依赖单目预测质量</strong>：Omnidata 失败时（极端视角、罕见物体）会引入错误监督，论文缺少对失败案例的过滤策略</li><li><strong>分辨率受限</strong>：Omnidata 输出仅 384×384，在高分辨率输入下细节丢失。论文提到有高分辨率初步实验但未深入</li><li><strong>深度只有相对尺度</strong>：需要每 batch 求解尺度/平移对齐，增加了优化复杂度和潜在的不稳定性</li><li><strong>未联合优化相机位姿</strong>：对噪声位姿敏感（Grids 尤其明显），论文承认这是未来方向</li><li><strong>未探索其他几何先验</strong>：如遮挡边界、平面、曲率等 Omnidata 也能预测的信号</li><li><strong>代码未公开</strong>：论文没有提供官方代码实现，复现需要自行搭建</li></ul>"
+    },
+    {
+      "id": "reproduce",
+      "title": "可复刻性",
+      "html": "<p><span class=\"flag risk\">复现难度：中高</span></p><ul><li><strong>框架依赖</strong>：基于 PyTorch + VolSDF/NeuS 的体渲染框架，需要熟悉神经辐射场代码</li><li><strong>单目模型</strong>：Omnidata 预训练权重需要单独下载和集成</li><li><strong>数据集</strong>：DTU、Replica、ScanNet、Tanks & Temples 都需要单独获取和处理</li><li><strong>超参敏感</strong>：$\\lambda_1=0.1$, $\\lambda_2=0.1$, $\\lambda_3=0.05$ 的权重配比、学习率、采样策略等都需要仔细调</li><li><strong>计算资源</strong>：大场景（Tanks & Temples）需要较大显存和较长训练时间</li><li><strong>无官方代码</strong>：增加了复现的不确定性</li></ul>"
+    }
+  ]
+}

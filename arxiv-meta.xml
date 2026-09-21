@@ -1,0 +1,37 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/kEkkf/+RGzgV64Wkk0nwuIC37SY</id>
+  <title>arXiv Query: search_query=&amp;id_list=2206.00665&amp;start=0&amp;max_results=10</title>
+  <updated>2026-09-21T01:35:30Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=&amp;start=0&amp;max_results=10&amp;id_list=2206.00665" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>1</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/2206.00665v2</id>
+    <title>MonoSDF: Exploring Monocular Geometric Cues for Neural Implicit Surface Reconstruction</title>
+    <updated>2022-10-12T12:16:03Z</updated>
+    <link href="https://arxiv.org/abs/2206.00665v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2206.00665v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>In recent years, neural implicit surface reconstruction methods have become popular for multi-view 3D reconstruction. In contrast to traditional multi-view stereo methods, these approaches tend to produce smoother and more complete reconstructions due to the inductive smoothness bias of neural networks. State-of-the-art neural implicit methods allow for high-quality reconstructions of simple scenes from many input views. Yet, their performance drops significantly for larger and more complex scenes and scenes captured from sparse viewpoints. This is caused primarily by the inherent ambiguity in the RGB reconstruction loss that does not provide enough constraints, in particular in less-observed and textureless areas. Motivated by recent advances in the area of monocular geometry prediction, we systematically explore the utility these cues provide for improving neural implicit surface reconstruction. We demonstrate that depth and normal cues, predicted by general-purpose monocular estimators, significantly improve reconstruction quality and optimization time. Further, we analyse and investigate multiple design choices for representing neural implicit surfaces, ranging from monolithic MLP models over single-grid to multi-resolution grid representations. We observe that geometric monocular priors improve performance both for small-scale single-object as well as large-scale multi-object scenes, independent of the choice of representation.</summary>
+    <category term="cs.CV" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2022-06-01T17:58:15Z</published>
+    <arxiv:comment>Project page: https://niujinshuchong.github.io/monosdf/</arxiv:comment>
+    <arxiv:primary_category term="cs.CV"/>
+    <author>
+      <name>Zehao Yu</name>
+    </author>
+    <author>
+      <name>Songyou Peng</name>
+    </author>
+    <author>
+      <name>Michael Niemeyer</name>
+    </author>
+    <author>
+      <name>Torsten Sattler</name>
+    </author>
+    <author>
+      <name>Andreas Geiger</name>
+    </author>
+  </entry>
+</feed>
