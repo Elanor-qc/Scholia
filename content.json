@@ -95,16 +95,16 @@
     {
       "id": "input",
       "title": "输入：多视角带位姿图像",
-      "html": "<p>给定一组带相机位姿的 RGB 图像 $\\{I_k, P_k\\}$，作为整个管线的输入。每张图像既用于后续的体渲染重建损失，也作为单目几何预测网络的输入。</p><p>论文在三个尺度上验证方法：<strong>物体级</strong>（DTU，3 视图稀疏输入 / 全视图密集输入）、<strong>房间级</strong>（Replica、ScanNet）、<strong>大尺度室内场景</strong>（Tanks & Temples advanced）。输入图像的分辨率在实验中被统一缩放到 384×384 用于单目预测。</p>"
-    },
-    {
-      "id": "mono",
-      "title": "单目几何预测：Omnidata",
-      "html": "<p>使用预训练的 <strong>Omnidata</strong> 模型（Deka et al. 2021）对每张输入图像独立预测：</p><ul><li><strong>深度图</strong> $\\bar{D}$：提供半局部的相对深度信息，能覆盖图像中较大范围的几何结构</li><li><strong>法向图</strong> $\\bar{N}$：提供局部几何细节，对纹理缺失区域（如墙面）也能可靠预测</li></ul><p>两者互补：深度给出整体结构，法向补充局部细节。由于单目深度只有相对尺度，后续需要通过最小二乘估计尺度 $w$ 和平移 $q$ 来对齐渲染深度与预测深度。</p><p>Omnidata 在大规模数据集上训练，泛化能力强，不需要针对特定场景微调，这是它能作为通用先验的关键。</p>",
+      "html": "<p>给定一组带相机位姿的 RGB 图像 $\\{I_k, P_k\\}$，作为整个管线的输入。每张图像既用于后续的体渲染重建损失，也作为单目几何预测网络的输入。</p><p>论文在三个尺度上验证方法：<strong>物体级</strong>（DTU，3 视图稀疏输入 / 全视图密集输入）、<strong>房间级</strong>（Replica、ScanNet）、<strong>大尺度室内场景</strong>（Tanks & Temples advanced）。输入图像的分辨率在实验中被统一缩放到 384×384 用于单目预测。</p>",
       "figure": {
         "src": "fig2_framework.png",
         "caption": "图 2：MonoSDF 框架概览。上方展示四种神经隐式表示架构（MLP、Dense SDF Grid、Single-res Feature Grid、Multi-res Feature Grids），下方展示单目几何预测与体渲染的联合优化流程。"
       }
+    },
+    {
+      "id": "mono",
+      "title": "单目几何预测：Omnidata",
+      "html": "<p>使用预训练的 <strong>Omnidata</strong> 模型（Deka et al. 2021）对每张输入图像独立预测：</p><ul><li><strong>深度图</strong> $\\bar{D}$：提供半局部的相对深度信息，能覆盖图像中较大范围的几何结构</li><li><strong>法向图</strong> $\\bar{N}$：提供局部几何细节，对纹理缺失区域（如墙面）也能可靠预测</li></ul><p>两者互补：深度给出整体结构，法向补充局部细节。由于单目深度只有相对尺度，后续需要通过最小二乘估计尺度 $w$ 和平移 $q$ 来对齐渲染深度与预测深度。</p><p>Omnidata 在大规模数据集上训练，泛化能力强，不需要针对特定场景微调，这是它能作为通用先验的关键。</p>"
     },
     {
       "id": "implicit",
