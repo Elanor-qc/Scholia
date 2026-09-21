@@ -3,3 +3,12 @@ __pycache__/
 .DS_Store
 Thumbs.db
 *.tmp
+
+# --- 论文阅读产物（skill 运行时生成） ---
+paper.pdf
+arxiv-meta.xml
+/content.json
+*-精读笔记.html
+figures/
+fig*.png
+examples/*.html
